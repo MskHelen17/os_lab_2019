@@ -15,18 +15,34 @@
 #include "find_min_max.h"
 #include "utils.h"
 
+//argc - кол-во параметров
+//argv - параметры
 int main(int argc, char **argv) {
-  int seed = -1;
-  int array_size = -1;
-  int pnum = -1;
-  bool with_files = false;
+  int seed = -1; //для srand
+  int array_size = -1; //размер сгенерированного массива
+  int pnum = -1; //кол-во процессов
+  bool with_files = false; //для синхронизации процессов использовать файлы, в противном случае pipe
+
+
 
   while (true) {
-    int current_optind = optind ? optind : 1;
+    //optind - индекс на следующий указатель argv, который будет обработан при следующем вызове getopt().
+    int current_optind = optind ? optind : 1; 
 
+    /*
+     struct option {
+    	const char *name;
+    	int has_arg;   //определяет нужно ли для этого параметра значение
+    	int *flag; //указатель на флаг, в который помещается значение val, если найден данный параметр
+    	int val;   //содержит значение, которое помещается в flag или возвращается в качестве результата работы функции
+     };
+     
+     Последняя запись массива longopts должна содержать нулевые значения, 
+     для того чтобы функция могла однозначно определить конец массива
+     */
     static struct option options[] = {{"seed", required_argument, 0, 0},
                                       {"array_size", required_argument, 0, 0},
-                                      {"pnum", required_argument, 0, 0},
+                                      {"pnum", required_argument, 0, 0},  
                                       {"by_files", no_argument, 0, 'f'},
                                       {0, 0, 0, 0}};
 
@@ -40,18 +56,24 @@ int main(int argc, char **argv) {
         switch (option_index) {
           case 0:
             seed = atoi(optarg);
-            // your code here
-            // error handling
+            if (seed <= 0) {
+                printf("seed must be a positive number\n");
+                return 1;
+              }
             break;
           case 1:
             array_size = atoi(optarg);
-            // your code here
-            // error handling
+            if (array_size <= 0) {
+                printf("array_size must be a positive number\n");
+                return 1;
+              }
             break;
           case 2:
             pnum = atoi(optarg);
-            // your code here
-            // error handling
+            if (pnum <= 0) {
+                printf("pnum must be a positive number\n");
+                return 1;
+              }
             break;
           case 3:
             with_files = true;
@@ -73,6 +95,9 @@ int main(int argc, char **argv) {
     }
   }
 
+
+
+
   if (optind < argc) {
     printf("Has at least one no option argument\n");
     return 1;
@@ -84,27 +109,42 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  //генерируем случайный массив
   int *array = malloc(sizeof(int) * array_size);
   GenerateArray(array, array_size, seed);
   int active_child_processes = 0;
 
+  //засекаем время
   struct timeval start_time;
   gettimeofday(&start_time, NULL);
 
+
+  int fd[2];  
+  pipe(fd);   //создаем pipe
+  int part = array_size/pnum;  //по сколько эл в массиве на поток
+   
+ //от нуля до кол-ва процессов
   for (int i = 0; i < pnum; i++) {
-    pid_t child_pid = fork();
+    pid_t child_pid = fork(); //порождаем дочерний процесс
     if (child_pid >= 0) {
       // successful fork
       active_child_processes += 1;
       if (child_pid == 0) {
         // child process
-
-        // parallel somehow
-
+        struct MinMax tmp;
+        
+        //находим минимум/максимум на данном кусочке массива
+        if(i != pnum - 1){  //если это не последний процесс
+            tmp = GetMinMax(array, i*part, (i+1)*part);
+        }
+        else tmp = GetMinMax(array, i*part, array_size);
+        
         if (with_files) {
-          // use files here
+          FILE* fp = fopen("numbers.txt", "a");
+          fwrite(&tmp, sizeof(struct MinMax), 1, fp);
+          fclose(fp);
         } else {
-          // use pipe here
+           write(fd[1], &tmp, sizeof(struct MinMax));
         }
         return 0;
       }
@@ -116,8 +156,10 @@ int main(int argc, char **argv) {
   }
 
   while (active_child_processes > 0) {
-    // your code here
-
+      
+    close(fd[1]);
+    wait(NULL);
+    
     active_child_processes -= 1;
   }
 
@@ -126,17 +168,19 @@ int main(int argc, char **argv) {
   min_max.max = INT_MIN;
 
   for (int i = 0; i < pnum; i++) {
-    int min = INT_MAX;
-    int max = INT_MIN;
+  struct MinMax min_max2;
 
     if (with_files) {
-      // read from files
+        FILE* fp = fopen("numbers.txt", "rb");
+        fseek(fp, i*sizeof(struct MinMax), SEEK_SET);
+        fread(&min_max2, sizeof(struct MinMax), 1, fp);
+        fclose(fp);
     } else {
-      // read from pipes
+        read(fd[0], &min_max2, sizeof(struct MinMax));
     }
 
-    if (min < min_max.min) min_max.min = min;
-    if (max > min_max.max) min_max.max = max;
+    if ( min_max2.min < min_max.min) min_max.min =  min_max2.min;
+    if ( min_max2.max > min_max.max) min_max.max =  min_max2.max;
   }
 
   struct timeval finish_time;
@@ -151,5 +195,6 @@ int main(int argc, char **argv) {
   printf("Max: %d\n", min_max.max);
   printf("Elapsed time: %fms\n", elapsed_time);
   fflush(NULL);
+  remove("numbers.txt");
   return 0;
 }
