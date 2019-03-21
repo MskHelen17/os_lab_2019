@@ -1,0 +1,27 @@
+gcc -c swap.c
+gcc -c main.c
+gcc swap.o main.o -o prSwap
+
+
+gcc -c revert_string.c
+gcc -c main.c
+gcc revert_string.o main.o -o prRevert
+./prRevert Lab2
+
+
+ar rcs libREVERT.a revert_string.o
+gcc main.o -L. -lREVERT -o REVENT-linked
+ ./REVENT-linked Lab2
+ 
+ 
+ gcc -c -fPIC revert_string.c -o revent_stringPIC.o
+ gcc -shared revent_stringPIC.o -o libdynamicREVENT.so
+ gcc main.o -L. -ldynamicREVENT -o dynamicREVENT-lynked
+ LD_LIBRARY_PATH=$(pwd)
+ export LD_LIBRARY_PATH
+ ./dynamicREVENT-lynked Lab2
+ 
+ 
+ sudo apt-get install libcunit1 libcunit1-doc libcunit1-dev
+ gcc -c tests.c -lcunit
+ gcc tests.o -L../revert_string -ldynamicREVENT -o dynamicREVENT-lynked2 -lcunit

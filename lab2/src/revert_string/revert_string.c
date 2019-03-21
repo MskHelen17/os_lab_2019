@@ -2,6 +2,12 @@
 
 void RevertString(char *str)
 {
-	// your code here
-}
+	int len = strlen(str);
+    int i = 0;
+    while(len>i){
+    	char tmp = str[--len];
+    	str[len]=str[i];
+    	str[i++]=tmp;
+    }
 
+}
