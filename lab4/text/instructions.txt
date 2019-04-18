@@ -1,0 +1,15 @@
+gcc -c parallel_min_max.c -o parallel_min_max.o && gcc parallel_min_max.o utils.o find_min_max.o -o parallel_min_max
+./parallel_min_max --seed 5 --array_size 100000000 --pnum 4 --timeout 1
+
+gcc -c zombie.c -o zombie.o && gcc zombie.o -o zombie
+./zombie &
+ps -al
+
+
+
+
+
+gcc -c parallel_sum.c -o parallel_sum.o
+gcc -c sum.c -o sum.o
+gcc parallel_sum.o utils.o sum.o -o parallel_sum -lpthread
+./parallel_sum --threads_num 1 --array_size 10000000 --seed 3
